@@ -1,5 +1,7 @@
 import java.io.IOException;
 import java.net.*;
+import java.util.Arrays;
+import java.util.Scanner;
 
 public class Message {
 
@@ -40,39 +42,44 @@ class SendThread extends Thread {
             throw new RuntimeException(e);
         }
 
-        // -------------------------------------
-        byte[] sendData = "client data test".getBytes();        // Create a buffer to send
-        // -------------------------------------
+        while (true) {
+            // -------------------------------------
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("To send: ");
+            byte[] sendData = scanner.nextLine().getBytes();
+            //byte[] sendData = "client data test".getBytes();        // Create a buffer to send
+            // -------------------------------------
 
-        DatagramSocket clientSocket = null;
-        try {
-            clientSocket = new DatagramSocket();
-        } catch (SocketException e) {
-            throw new RuntimeException(e);
+            DatagramSocket clientSocket = null;
+            try {
+                clientSocket = new DatagramSocket();
+            } catch (SocketException e) {
+                throw new RuntimeException(e);
+            }
+
+            // Creating the datagram
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, sentPort);
+
+            try {
+                clientSocket.send(sendPacket);      // Send the packet to the server
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            byte[] recBuffer = new byte[1024];      // Receive buffer
+            DatagramPacket recPacket = new DatagramPacket(recBuffer, recBuffer.length);
+            try {
+                clientSocket.receive(recPacket);    // Received datagram (Blocking)
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            // Obtaining the info
+            String info = new String(recPacket.getData(), recPacket.getOffset(), recPacket.getLength());
+            System.out.println(info);
+
+            //clientSocket.close();   // Close the socket
         }
-
-        // Creating the datagram
-        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, sentPort);
-
-        try {
-            clientSocket.send(sendPacket);      // Send the packet to the server
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        byte[] recBuffer = new byte[1024];      // Receive buffer
-        DatagramPacket recPacket = new DatagramPacket(recBuffer, recBuffer.length);
-        try {
-            clientSocket.receive(recPacket);    // Received datagram (Blocking)
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        // Obtaining the info
-        String info = new String(recPacket.getData(), recPacket.getOffset(), recPacket.getLength());
-        System.out.println(info);
-
-        clientSocket.close();   // Close the socket
     }
 }
 
@@ -105,7 +112,19 @@ class ReceiveThread extends Thread {
             }
 
             //-------------------------------------
-            byte[] sendBuffer = "server data test".getBytes();
+            byte[] recTest = recPacket.getData();
+            int count = 0;
+
+            for (int i = 0; i < recTest.length; i++){
+                if(Byte.compare(recTest[i], (byte) '\0') == 0){
+                    break;
+                }
+                count++;
+            }
+
+            byte[] sendBuffer = Arrays.copyOfRange(recPacket.getData(), 0, count);
+
+            //byte[] sendBuffer = "server data test".getBytes();
             //-------------------------------------
 
             DatagramPacket sendPacket = new DatagramPacket(sendBuffer,
