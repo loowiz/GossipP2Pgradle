@@ -2,6 +2,17 @@ import java.io.IOException;
 import java.net.*;
 
 public class Message {
+
+
+    /* Recebe o nome do arquivo a ser procurado (requisição search)
+     * Verifica se possui o arquivo
+     * Se possuir, retorna a informação de que possui
+     * Caso não possuir, escolhe um peer dentre os conhecidos (random)
+     * realiza a requisição para este peer escolhido
+     * o processo se repete, pois o peer verifica se possui o arquivo e responde se tiver, passa pra frente caso não tenha...
+     *
+     */
+
     public static void main(String[] args) {
         ReceiveThread rcv = new ReceiveThread(9000);
         rcv.start();

@@ -149,6 +149,7 @@ public class Peer {
                 t1 = new PeriodicTask(30, p1);
                 t1.start(p1);
             }
+
             if (option.equalsIgnoreCase("search")) {
                 if (debug) System.out.print("Name of the file: ");
                 String searchFile = scanner.nextLine();
@@ -156,6 +157,7 @@ public class Peer {
 
 
             }
+
             if (option.equalsIgnoreCase("exit")) {
                 if (debug) System.out.println("Bye!");
                 if (t1 != null) {
