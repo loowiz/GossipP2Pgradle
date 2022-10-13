@@ -46,10 +46,9 @@ public class Peer {
         File fileDir = new File(peerFolder);
         String[] files = fileDir.list();
 
-        List<String> filesList = new ArrayList();
-        for (String file : files) {
-            filesList.add(file);
-        }
+        List<String> filesList = new ArrayList<>();
+        if (files == null) throw new AssertionError();
+        Collections.addAll(filesList, files);
 
         return filesList;
     }
@@ -77,9 +76,7 @@ public class Peer {
      * @return only the new files.
      */
     public List<String> hasNewFiles(List<String> newList) {
-        List<String> newFiles = new ArrayList();
-
-        newFiles.addAll(newList);
+        List<String> newFiles = new ArrayList<>(newList);
         newFiles.removeAll(this.peerFiles);
 
         return newFiles;
@@ -93,9 +90,7 @@ public class Peer {
      * @return only the removed files.
      */
     public List<String> hasRemovedFiles(List<String> newList) {
-        List<String> removedFiles = new ArrayList();
-
-        removedFiles.addAll(this.peerFiles);
+        List<String> removedFiles = new ArrayList<>(this.peerFiles);
         removedFiles.removeAll(newList);
 
         return removedFiles;
@@ -103,47 +98,80 @@ public class Peer {
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
+        boolean run = true;
+        Peer p1;
+        PeriodicTask t1 = null;
 
-        /* --------------------------------------------------
-        b)	Inicialização: captura do teclado o IP e porta do peer X, a pasta onde estão localizados seus arquivos,
-            e o IP e porta de outros dois peers.
-        -------------------------------------------------- */
-        if(debug) System.out.println("Welcome new peer!");
-        if(debug) System.out.print("Peer X IP address: ");
-        String peerXIP = scanner.nextLine();
-        if(debug) System.out.print("Peer X Port: ");
-        int peerXPort = scanner.nextInt();
-        scanner.nextLine();
-        if(debug) System.out.print("Peer X folder path: ");
-        String peerXFolder = scanner.nextLine();
-        if(debug) System.out.print("Neighbor A IP address: ");
-        String neighborAIP = scanner.nextLine();
-        if(debug) System.out.print("Neighbor A Port: ");
-        int neighborAPort = scanner.nextInt();
-        scanner.nextLine();
-        if(debug) System.out.print("Neighbor B IP address: ");
-        String neighborBIP = scanner.nextLine();
-        if(debug) System.out.print("Neighbor B Port: ");
-        int neighborBPort = scanner.nextInt();
-        scanner.nextLine();
-        if(debug) System.out.println();
+        while(run) {
+            /* --------------------------------------------------
+            Menu interativo (por console) que permita realizar a escolha somente das
+            funções INICIALIZA e SEARCH.
+            */
+            if (debug) System.out.println("Choose an option: ");
+            if (debug) System.out.println("INICIALIZA");
+            if (debug) System.out.println("SEARCH");
+            String option = scanner.nextLine();
 
-        Peer p1 = new Peer(peerXIP, peerXPort, peerXFolder, neighborAIP, neighborAPort, neighborBIP, neighborBPort);
+            if (option.equalsIgnoreCase("inicializa")) {
+                /* --------------------------------------------------
+                b)	Inicialização: captura do teclado o IP e porta do peer X, a pasta onde estão localizados
+                    seus arquivos, e o IP e porta de outros dois peers.
+                -------------------------------------------------- */
+                if (debug) System.out.println("Welcome new peer!");
+                if (debug) System.out.print("Peer X IP address: ");
+                String peerXIP = scanner.nextLine();
+                if (debug) System.out.print("Peer X Port: ");
+                int peerXPort = scanner.nextInt();
+                scanner.nextLine();
+                if (debug) System.out.print("Peer X folder path: ");
+                String peerXFolder = scanner.nextLine();
+                if (debug) System.out.print("Neighbor A IP address: ");
+                String neighborAIP = scanner.nextLine();
+                if (debug) System.out.print("Neighbor A Port: ");
+                int neighborAPort = scanner.nextInt();
+                scanner.nextLine();
+                if (debug) System.out.print("Neighbor B IP address: ");
+                String neighborBIP = scanner.nextLine();
+                if (debug) System.out.print("Neighbor B Port: ");
+                int neighborBPort = scanner.nextInt();
+                scanner.nextLine();
+                if (debug) System.out.println();
 
-        /* --------------------------------------------------
-        c)	Monitoramento da pasta: cada 30 segundos o peer verificará se na pasta (capturada na inicialização)
-            houveram modificações, ou seja se foram inseridos ou removidos arquivos. A lista de arquivos deverá
-            estar armazenada em alguma estrutura na memória, por exemplo, uma lista ou um hash.
-        -------------------------------------------------- */
-        PeriodicTask t1 = new PeriodicTask(30, p1);
-        t1.start(p1);
+                p1 = new Peer(peerXIP, peerXPort, peerXFolder, neighborAIP, neighborAPort, neighborBIP, neighborBPort);
 
+                System.out.print("arquivos da pasta: ");
+                System.out.println(p1.printListOfFiles(p1.peerFiles));
+                /* --------------------------------------------------
+                c)	Monitoramento da pasta: cada 30 segundos o peer verificará se na pasta (capturada na
+                    inicialização) houveram modificações, ou seja se foram inseridos ou removidos arquivos.
+                    A lista de arquivos deverá estar armazenada em alguma estrutura na memória, por exemplo,
+                    uma lista ou um hash.
+                -------------------------------------------------- */
+                t1 = new PeriodicTask(30, p1);
+                t1.start(p1);
+            }
+            if (option.equalsIgnoreCase("search")) {
+                if (debug) System.out.print("Name of the file: ");
+                String searchFile = scanner.nextLine();
+            }
+            if (option.equalsIgnoreCase("exit")) {
+                if (debug) System.out.println("Bye!");
+                if (t1 != null) {
+                    t1.stop();
+                }
+                run = false;
+            }
+        }
+
+
+
+        /*
+        // Generate JSON from object Peer p1:
         Gson gson = new Gson();
+        String json = gson.toJson(p1);
+        System.out.println(json);
+        */
 
-        while(true);
-        // TODO:
-
-        //t1.stop();
 
     }
 }
@@ -152,7 +180,7 @@ public class Peer {
  * Class PeriodicTask is used for periodic actions with timer threads.
  */
 class PeriodicTask extends TimerTask {
-    private int period;
+    private final int period;
     Timer timer;
     Peer p;
     private static final boolean debug = false;
@@ -173,7 +201,7 @@ class PeriodicTask extends TimerTask {
      */
     public void start(Peer p) {
         TimerTask timerTask = new PeriodicTask(period, p);
-        timer.scheduleAtFixedRate(timerTask, 0, period*1000);
+        timer.scheduleAtFixedRate(timerTask, 0, (long)period*1000);
         if(debug) System.out.println("Started the periodic check for new files!");
     }
 
@@ -187,9 +215,6 @@ class PeriodicTask extends TimerTask {
     @Override
     public void run() {
         if(debug) System.out.println("New check at: " + new Date());
-
-        System.out.print("Sou peer " + p.peerIP + ":" + p.peerPort + " com arquivos ");
-        System.out.println(p.printListOfFiles(p.peerFiles));
 
         List<String> newCheck = p.listFiles();
         List<String> newFiles = p.hasNewFiles(newCheck);
@@ -206,5 +231,8 @@ class PeriodicTask extends TimerTask {
         } else {
             if(debug) System.out.println("The list of files is up to date!\n");
         }
+
+        System.out.print("Sou peer " + p.peerIP + ":" + p.peerPort + " com arquivos ");
+        System.out.println(p.printListOfFiles(p.peerFiles));
     }
 }
