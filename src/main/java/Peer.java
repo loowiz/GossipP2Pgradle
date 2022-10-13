@@ -8,10 +8,9 @@ public class Peer {
     int peerPort;
     List<String> peerFiles;
     String peerFolder;
-    String neighborAIP;
-    int neighborAPort;
-    String neighborBIP;
-    int neighborBPort;
+    String[] knownIP = new String[2];
+    int[] knownPort = new int[2];
+
     private static final boolean debug = true;
 
     /**
@@ -31,10 +30,10 @@ public class Peer {
         this.peerPort = peerPort;
         this.peerFolder = peerFolder;
         this.peerFiles = listFiles();
-        this.neighborAIP = neighborAIP;
-        this.neighborAPort = neighborAPort;
-        this.neighborBIP = neighborBIP;
-        this.neighborBPort = neighborBPort;
+        this.knownIP[0] = neighborAIP;
+        this.knownPort[0] = neighborAPort;
+        this.knownIP[1] = neighborBIP;
+        this.knownPort[1] = neighborBPort;
     }
 
     /**
@@ -153,6 +152,9 @@ public class Peer {
             if (option.equalsIgnoreCase("search")) {
                 if (debug) System.out.print("Name of the file: ");
                 String searchFile = scanner.nextLine();
+
+
+
             }
             if (option.equalsIgnoreCase("exit")) {
                 if (debug) System.out.println("Bye!");
