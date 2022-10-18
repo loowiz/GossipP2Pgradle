@@ -98,8 +98,9 @@ public class Peer {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
         boolean run = true;
-        Peer p1;
+        Peer p1 = null;
         PeriodicTask t1 = null;
+        ReceiveThread rcv = null;
 
         while(run) {
             /* --------------------------------------------------
@@ -140,6 +141,7 @@ public class Peer {
 
                 System.out.print("arquivos da pasta: ");
                 System.out.println(p1.printListOfFiles(p1.peerFiles));
+
                 /* --------------------------------------------------
                 c)	Monitoramento da pasta: cada 30 segundos o peer verificará se na pasta (capturada na
                     inicialização) houveram modificações, ou seja se foram inseridos ou removidos arquivos.
@@ -154,9 +156,15 @@ public class Peer {
                 if (debug) System.out.print("Name of the file: ");
                 String searchFile = scanner.nextLine();
 
-
+                rcv = new ReceiveThread(p1.peerPort);
+                rcv.start();
 
             }
+
+            if (option.equalsIgnoreCase("response")) {
+                if (debug) System.out.print("Response received: ");
+            }
+
 
             if (option.equalsIgnoreCase("exit")) {
                 if (debug) System.out.println("Bye!");
