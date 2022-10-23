@@ -9,7 +9,6 @@ public class Peer {
     String[] knownIP = new String[2];
     int[] knownPort = new int[2];
     int status;
-
     private static final boolean DEBUG = true;
 
     /**
@@ -132,22 +131,29 @@ public class Peer {
         PeriodicTask t1 = null;
         ReceiveThread rcv = null;
         String request = null;
+        String userInput = null;
+        int option = 0;
 
-        while(run) {
-            /* --------------------------------------------------
-            Menu interativo (por console) que permita realizar a escolha somente das
-            funções INICIALIZA e SEARCH.
-            */
-            if (DEBUG) System.out.println("Choose an option: ");
-            if (DEBUG) System.out.println("INICIALIZA");
-            if (DEBUG) System.out.println("SEARCH");
-            String option = scanner.nextLine();
+        while (true) {
+            if (option <= 2) {
+                if (DEBUG) System.out.println("Choose an option: ");
+                if (DEBUG) System.out.println("INICIALIZA");
+                if (DEBUG) System.out.println("SEARCH [IP]:[PORT] [file.extension]");
 
-            if (option.equalsIgnoreCase("inicializa")) {
-                /* --------------------------------------------------
-                b)	Inicialização: captura do teclado o IP e porta do peer X, a pasta onde estão localizados
-                    seus arquivos, e o IP e porta de outros dois peers.
-                -------------------------------------------------- */
+                userInput = scanner.nextLine();
+                if (userInput.equalsIgnoreCase("inicializa")) {
+                    option = 1;
+                } else if (userInput.toLowerCase().contains("search")) {
+                    option = 2;
+                } else if (userInput.equalsIgnoreCase("exit")) {
+                    option = 3;
+                }
+            }
+
+            if (option == 1) {
+                // -----------------------------------------------
+                // INITIALIZE SEQUENCE:
+                // -----------------------------------------------
                 if (DEBUG) System.out.println("Welcome new peer!");
                 if (DEBUG) System.out.print("Peer X IP address: ");
                 String peerXIP = scanner.nextLine();
@@ -168,39 +174,85 @@ public class Peer {
                 scanner.nextLine();
                 if (DEBUG) System.out.println();
 
+                // Creating the Peer object:
                 p1 = new Peer(peerXIP, peerXPort, peerXFolder, neighborAIP, neighborAPort, neighborBIP, neighborBPort);
+                if (DEBUG) System.out.print("Arquivos da pasta: " + p1.printListOfFiles(p1.peerFiles) + "\n");
 
-                System.out.print("arquivos da pasta: ");
-                System.out.println(p1.printListOfFiles(p1.peerFiles));
+                // Starting periodic task:
+                t1 = new PeriodicTask(30, p1);
+                t1.start(p1);
+                if (DEBUG) System.out.println("Periodic folder verification has started!");
 
+                // Starting the receipt handler thread:
                 rcv = new ReceiveThread(p1.peerPort, p1);
                 rcv.start();
                 if (DEBUG) System.out.println("Communication has started!");
 
-                /* --------------------------------------------------
-                c)	Monitoramento da pasta: cada 30 segundos o peer verificará se na pasta (capturada na
-                    inicialização) houveram modificações, ou seja se foram inseridos ou removidos arquivos.
-                    A lista de arquivos deverá estar armazenada em alguma estrutura na memória, por exemplo,
-                    uma lista ou um hash.
-                -------------------------------------------------- */
-                t1 = new PeriodicTask(30, p1);
-                t1.start(p1);
-            }
-
-            if (option.toLowerCase().contains("search")) {
+            } else if (option == 2) {
+                // -----------------------------------------------
+                // SEARCH USER INPUT
+                // -----------------------------------------------
                 if (DEBUG) System.out.println("SEARCH from terminal...");
-                request = option;
+                request = userInput;
+                option = 3;
                 p1.setStatus(1);
-            }
 
-            if(rcv.dataRX.toString().toLowerCase().contains("search")) {
+            } else if (option == 3) {
+                // -----------------------------------------------
+                // SEARCH ROUTINE
+                // -----------------------------------------------
+                if (DEBUG) System.out.println("Analysing data received...");
+                String senderIP = request.substring(7, request.indexOf(":"));
+                String senderPort = request.substring(request.indexOf(":") + 1, request.indexOf(" ", request.indexOf(senderIP)));
+                String fileNeeded = request.substring(request.indexOf(senderPort) + senderPort.length() + 1, request.length());
+                if (DEBUG) System.out.println("Sender IP: " + senderIP);
+                if (DEBUG) System.out.println("Sender Port: " + senderPort);
+                if (DEBUG) System.out.println("File request: " + fileNeeded);
+                if (DEBUG) System.out.println();
+
+                // Search locally for the file needed:
+                if (DEBUG) System.out.println("Searching locally...");
+                if(p1.peerFiles.contains(fileNeeded)){
+                    System.out.println("RESPONSE " + p1.peerIP + ":" + p1.peerPort);
+                    p1.setStatus(0);
+                    option = 0;
+                } else {
+                    // Send to another known peer:
+                    if (DEBUG) System.out.println("File not found here... Another peer will take care of if!");
+                    StringBuilder builder = new StringBuilder();
+                    builder.append("SEARCH " + senderIP + ":" + senderPort + " " + fileNeeded);
+
+                    SendThread snd = new SendThread(
+                            p1.knownIP[p1.choosePeer(2)],
+                            p1.knownPort[p1.choosePeer(2)],
+                            builder.toString().getBytes());
+                    snd.run();
+                    p1.setStatus(0);
+                    option = 4;
+                }
+            } else if (option == 4) {
+                if (p1.getStatus() == 1 && rcv.dataRX.toString().toLowerCase().contains("response")) {
+                    if (DEBUG) System.out.print("Response received: ");
+                }
+            }
+        }
+
+
+
+
+
+
+        /*
+        while(run) {
+            if(rcv.getDataRX().toString().toLowerCase().contains("search")) {
                 if (DEBUG) System.out.println("SEARCH from UDP...");
-                request = rcv.dataRX.toString();
+                request = rcv.getDataRX().toString();
                 p1.setStatus(1);
             }
 
             if (p1.getStatus() == 1) {
                 if (DEBUG) System.out.println("Analysing data received...");
+
                 String senderIP = request.substring(7, request.indexOf(":"));
                 String senderPort = request.substring(request.indexOf(":") + 1, request.indexOf(" ", request.indexOf(senderIP)));
                 String fileNeeded = request.substring(request.indexOf(senderPort) + senderPort.length() + 1, request.length());
@@ -227,6 +279,7 @@ public class Peer {
                     snd.start();
                     p1.setStatus(0);
                 }
+
             }
 
             if (p1.getStatus() == 1 && rcv.dataRX.toString().toLowerCase().contains("response")) {
@@ -241,8 +294,7 @@ public class Peer {
                 run = false;
             }
         }
-
-
+        */
 
         /*
         // Generate JSON from object Peer p1:
@@ -250,7 +302,6 @@ public class Peer {
         String json = gson.toJson(p1);
         System.out.println(json);
         */
-
 
     }
 }

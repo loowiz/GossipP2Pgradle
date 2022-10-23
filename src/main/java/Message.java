@@ -52,6 +52,7 @@ class SendThread extends Thread {
     String sendIP;
     int sentPort;
     byte[] dataTX;
+    private static final boolean DEBUG = true;
 
     public SendThread(String sendIP, int sentPort, byte[] dataTX) {
         this.sendIP = sendIP;
@@ -63,17 +64,13 @@ class SendThread extends Thread {
     public void run() {
         InetAddress IPAddress = null;
         try {
-            IPAddress = InetAddress.getByName(sendIP);      // Remote host IP address (server)
+            IPAddress = InetAddress.getByName(sendIP);      // Remote host IP address
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }
 
         while (true) {
-            //Scanner scanner = new Scanner(System.in);
-            //System.out.println("To send: ");
-            //byte[] sendData = scanner.nextLine().getBytes();
-
-            byte[] sendData = this.dataTX;
+            if (DEBUG) System.out.println("Sending data...");
 
             DatagramSocket clientSocket = null;
             try {
@@ -83,6 +80,7 @@ class SendThread extends Thread {
             }
 
             // Creating the datagram
+            byte[] sendData = this.dataTX;
             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, sentPort);
 
             try {
@@ -120,13 +118,17 @@ class ReceiveThread extends Thread {
     public ReceiveThread(int myPort, Peer p1) {
         this.myPort = myPort;
         this.p1 = p1;
+    }
 
+    public byte[] getDataRX() {
+        return dataRX;
     }
 
     @Override
     public void run() {
         boolean activeConnection = true;
 
+        // Creating a datagram socket with a given port:
         DatagramSocket serverSocket = null;
         try {
             serverSocket = new DatagramSocket(myPort);
@@ -138,10 +140,8 @@ class ReceiveThread extends Thread {
             byte[] recBuffer = new byte[1024];      // Receive buffer
             DatagramPacket recPacket = new DatagramPacket(recBuffer, recBuffer.length); // Create receive datagram
 
-            if (DEBUG) System.out.println("Waiting receive...");
-
             try {
-                //serverSocket.setSoTimeout(30*1000);
+                serverSocket.setSoTimeout(300*1000);
                 if (p1.getStatus() == 1) {
                     serverSocket.receive(recPacket);    // Receive remote host datagram (Blocking)
 
