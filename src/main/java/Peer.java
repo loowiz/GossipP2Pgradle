@@ -9,6 +9,7 @@ public class Peer {
     String[] knownIP = new String[2];
     int[] knownPort = new int[2];
     int status;
+    String requestNeighbor = null;
     private static final boolean DEBUG = true;
 
     /**
@@ -124,6 +125,14 @@ public class Peer {
         return random.nextInt(nPeers);
     }
 
+    public String getRequestNeighbor() {
+        return requestNeighbor;
+    }
+
+    public void setRequestNeighbor(String requestNeighbor) {
+        this.requestNeighbor = requestNeighbor;
+    }
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
         boolean run = true;
@@ -146,7 +155,7 @@ public class Peer {
                 } else if (userInput.toLowerCase().contains("search")) {
                     option = 2;
                 } else if (userInput.equalsIgnoreCase("exit")) {
-                    option = 3;
+                    option = 100;
                 }
             }
 
@@ -184,8 +193,8 @@ public class Peer {
                 if (DEBUG) System.out.println("Periodic folder verification has started!");
 
                 // Starting the receipt handler thread:
-                rcv = new ReceiveThread(p1.peerPort, p1);
-                rcv.start();
+                rcv = new ReceiveThread(p1.peerPort, p1, true);
+                rcv.run();
                 if (DEBUG) System.out.println("Communication has started!");
 
             } else if (option == 2) {
@@ -219,82 +228,27 @@ public class Peer {
                 } else {
                     // Send to another known peer:
                     if (DEBUG) System.out.println("File not found here... Another peer will take care of if!");
+                    rcv.setActiveConnection(true);
                     StringBuilder builder = new StringBuilder();
                     builder.append("SEARCH " + senderIP + ":" + senderPort + " " + fileNeeded);
+
+                    p1.setRequestNeighbor(builder.toString());
 
                     SendThread snd = new SendThread(
                             p1.knownIP[p1.choosePeer(2)],
                             p1.knownPort[p1.choosePeer(2)],
                             builder.toString().getBytes());
                     snd.run();
-                    p1.setStatus(0);
-                    option = 4;
+                    option = 0;
                 }
-            } else if (option == 4) {
-                if (p1.getStatus() == 1 && rcv.dataRX.toString().toLowerCase().contains("response")) {
-                    if (DEBUG) System.out.print("Response received: ");
-                }
-            }
-        }
-
-
-
-
-
-
-        /*
-        while(run) {
-            if(rcv.getDataRX().toString().toLowerCase().contains("search")) {
-                if (DEBUG) System.out.println("SEARCH from UDP...");
-                request = rcv.getDataRX().toString();
-                p1.setStatus(1);
-            }
-
-            if (p1.getStatus() == 1) {
-                if (DEBUG) System.out.println("Analysing data received...");
-
-                String senderIP = request.substring(7, request.indexOf(":"));
-                String senderPort = request.substring(request.indexOf(":") + 1, request.indexOf(" ", request.indexOf(senderIP)));
-                String fileNeeded = request.substring(request.indexOf(senderPort) + senderPort.length() + 1, request.length());
-                if (DEBUG) System.out.println("Sender IP: " + senderIP);
-                if (DEBUG) System.out.println("Sender Port: " + senderPort);
-                if (DEBUG) System.out.println("File request: " + fileNeeded);
-                if (DEBUG) System.out.println();
-
-                // Search locally for the file needed:
-                if (DEBUG) System.out.println("Searching locally...");
-                if(p1.peerFiles.contains(fileNeeded)){
-                    System.out.println("RESPONSE " + p1.peerIP + ":" + p1.peerPort);
-                    p1.setStatus(0);
-                } else {
-                    // Send to another known peer:
-                    if (DEBUG) System.out.println("File not found here... Another peer will take care of if!");
-                    StringBuilder builder = new StringBuilder();
-                    builder.append("SEARCH " + senderIP + ":" + senderPort + " " + fileNeeded);
-
-                    SendThread snd = new SendThread(
-                            p1.knownIP[p1.choosePeer(2)],
-                            p1.knownPort[p1.choosePeer(2)],
-                            builder.toString().getBytes());
-                    snd.start();
-                    p1.setStatus(0);
-                }
-
-            }
-
-            if (p1.getStatus() == 1 && rcv.dataRX.toString().toLowerCase().contains("response")) {
-                if (DEBUG) System.out.print("Response received: ");
-            }
-
-            if (option.equalsIgnoreCase("exit")) {
+            } else if (option == 100) {
+                // -----------------------------------------------
+                // EXIT
+                // -----------------------------------------------
                 if (DEBUG) System.out.println("Bye!");
-                if (t1 != null) {
-                    t1.stop();
-                }
-                run = false;
+                System.exit(0);
             }
         }
-        */
 
         /*
         // Generate JSON from object Peer p1:

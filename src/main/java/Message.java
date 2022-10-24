@@ -1,7 +1,6 @@
 import java.io.IOException;
 import java.net.*;
 import java.util.Arrays;
-import java.util.Scanner;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -49,19 +48,30 @@ public class Message {
  * This class is a thread used to send UDP data.
  */
 class SendThread extends Thread {
-    String sendIP;
-    int sentPort;
-    byte[] dataTX;
+    private String sendIP;
+    private int sendPort;
+    private byte[] dataTX;
     private static final boolean DEBUG = true;
 
-    public SendThread(String sendIP, int sentPort, byte[] dataTX) {
+    /**
+     * Constructor for the send object.
+     *
+     * @param sendIP the peer IP.
+     * @param sendPort the peer port.
+     * @param dataTX the data to send.
+     */
+    public SendThread(String sendIP, int sendPort, byte[] dataTX) {
         this.sendIP = sendIP;
-        this.sentPort = sentPort;
+        this.sendPort = sendPort;
         this.dataTX = dataTX;
     }
 
+    /**
+     * The concurrent method.
+     */
     @Override
     public void run() {
+        // Establish the IP address:
         InetAddress IPAddress = null;
         try {
             IPAddress = InetAddress.getByName(sendIP);      // Remote host IP address
@@ -69,40 +79,28 @@ class SendThread extends Thread {
             throw new RuntimeException(e);
         }
 
-        while (true) {
-            if (DEBUG) System.out.println("Sending data...");
+        if (DEBUG) System.out.println("Sending data...");
 
-            DatagramSocket clientSocket = null;
-            try {
-                clientSocket = new DatagramSocket();
-            } catch (SocketException e) {
-                throw new RuntimeException(e);
-            }
-
-            // Creating the datagram
-            byte[] sendData = this.dataTX;
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, sentPort);
-
-            try {
-                clientSocket.send(sendPacket);      // Send the packet to the server
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-
-            byte[] recBuffer = new byte[1024];      // Receive buffer
-            DatagramPacket recPacket = new DatagramPacket(recBuffer, recBuffer.length);
-            try {
-                clientSocket.receive(recPacket);    // Received datagram (Blocking)
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-
-            // Obtaining the info
-            String info = new String(recPacket.getData(), recPacket.getOffset(), recPacket.getLength());
-            System.out.println(info);
-
-            //clientSocket.close();   // Close the socket
+        // Creating the datagram socket:
+        DatagramSocket clientSocket = null;
+        try {
+            clientSocket = new DatagramSocket();
+        } catch (SocketException e) {
+            throw new RuntimeException(e);
         }
+
+        // Creating the datagram packet:
+        byte[] sendData = this.dataTX;
+        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, sendPort);
+
+        // Sending data:
+        try {
+            clientSocket.send(sendPacket);      // Send the packet to the server
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        //clientSocket.close();   // Close the socket
     }
 }
 
@@ -110,24 +108,46 @@ class SendThread extends Thread {
  * This class is a thread to receive UDP data.
  */
 class ReceiveThread extends Thread {
-    int myPort;
-    byte[] dataRX;
-    Peer p1 = null;
+    private int myPort;
+    private byte[] dataRX;
+    private Peer p1 = null;
     private static final boolean DEBUG = true;
+    private boolean activeConnection;
 
-    public ReceiveThread(int myPort, Peer p1) {
+    /**
+     * Constructor for the receive object.
+     *
+     * @param myPort is the peer port.
+     * @param p1 is the peer object.
+     */
+    public ReceiveThread(int myPort, Peer p1, boolean activeConnection) {
         this.myPort = myPort;
         this.p1 = p1;
+        this.activeConnection = activeConnection;
     }
 
+    /**
+     * Getter to dataRX.
+     *
+     * @return the dataRX byte.
+     */
     public byte[] getDataRX() {
         return dataRX;
     }
 
+    public void setDataRX(byte[] dataRX) {
+        this.dataRX = dataRX;
+    }
+
+    public void setActiveConnection(boolean activeConnection) {
+        this.activeConnection = activeConnection;
+    }
+
+    /**
+     * The concurrent method.
+     */
     @Override
     public void run() {
-        boolean activeConnection = true;
-
         // Creating a datagram socket with a given port:
         DatagramSocket serverSocket = null;
         try {
@@ -136,47 +156,87 @@ class ReceiveThread extends Thread {
             throw new RuntimeException(e);
         }
 
+        if (DEBUG) System.out.println("Waiting for data...");
+
+        // Create receive datagram:
+        byte[] recBuffer = new byte[1024];
+        DatagramPacket recPacket = new DatagramPacket(recBuffer, recBuffer.length);
+
         while (activeConnection) {
-            byte[] recBuffer = new byte[1024];      // Receive buffer
-            DatagramPacket recPacket = new DatagramPacket(recBuffer, recBuffer.length); // Create receive datagram
-
             try {
-                serverSocket.setSoTimeout(300*1000);
-                if (p1.getStatus() == 1) {
-                    serverSocket.receive(recPacket);    // Receive remote host datagram (Blocking)
+                serverSocket.setSoTimeout(10*1000);
+                // Receive remote host datagram (Blocking)
+                serverSocket.receive(recPacket);
 
-                    byte[] recTest = recPacket.getData();
-                    int count = 0;
+                // Measure the amount of valid data:
+                byte[] recTest = recPacket.getData();
+                int count = 0;
+                for (int i = 0; i < recTest.length; i++) {
+                    if (Byte.compare(recTest[i], (byte) '\0') == 0) {
+                        break;
+                    }
+                    count++;
+                }
 
-                    // This count the amount of valid data
-                    for (int i = 0; i < recTest.length; i++) {
-                        if (Byte.compare(recTest[i], (byte) '\0') == 0) {
-                            break;
-                        }
-                        count++;
+                // Update the received data:
+                byte[] bufferRX = Arrays.copyOfRange(recPacket.getData(), 0, count);
+                //setDataRX(Arrays.copyOfRange(recPacket.getData(), 0, count));
+                if (DEBUG) System.out.println("New data received!");
+
+                // Verify if it is a SEARCH
+                if (bufferRX.toString().toLowerCase().contains("search")) {
+                    String senderIP = p1.getRequestNeighbor().substring(7, p1.getRequestNeighbor().indexOf(":"));
+                    String senderPort = p1.getRequestNeighbor().substring(
+                            p1.getRequestNeighbor().indexOf(":") + 1,
+                            p1.getRequestNeighbor().indexOf(" ", p1.getRequestNeighbor().indexOf(senderIP)));
+                    String fileNeeded = p1.getRequestNeighbor().substring(
+                            p1.getRequestNeighbor().indexOf(senderPort) + senderPort.length() + 1,
+                            p1.getRequestNeighbor().length());
+
+                    if(p1.peerFiles.contains(fileNeeded)){
+                        StringBuilder builder = new StringBuilder();
+                        builder.append("RESPONSE " + p1.peerIP + ":" + p1.peerPort);
+
+                        SendThread snd = new SendThread(
+                                senderIP,
+                                Integer.valueOf(senderPort),
+                                builder.toString().getBytes());
+                        snd.run();
+                        p1.setStatus(0);
+                    } else {
+                        if (DEBUG) System.out.println("File not found here... Another peer will take care of if!");
+                        StringBuilder builder = new StringBuilder();
+                        builder.append("SEARCH " + senderIP + ":" + senderPort + " " + fileNeeded);
+
+                        p1.setRequestNeighbor(builder.toString());
+
+                        SendThread snd = new SendThread(
+                                p1.knownIP[p1.choosePeer(2)],
+                                p1.knownPort[p1.choosePeer(2)],
+                                builder.toString().getBytes());
+                        snd.run();
+                        p1.setStatus(0);
                     }
 
-                    //byte[] sendBuffer = Arrays.copyOfRange(recPacket.getData(), 0, count);
-                    this.dataRX = Arrays.copyOfRange(recPacket.getData(), 0, count);
+                // Verify if it is a RESPONSE
+                } if (bufferRX.toString().toLowerCase().contains("response")) {
+                    String ownerIP = getDataRX().toString().substring(9, getDataRX().toString().indexOf(":"));
+                    String ownerPort = getDataRX().toString().substring(
+                            getDataRX().toString().indexOf(":") + 1, getDataRX().toString().length());
 
-                    //DatagramPacket sendPacket = new DatagramPacket(
-                    //        sendBuffer,
-                    //        sendBuffer.length,
-                    //        recPacket.getAddress(),
-                    //        recPacket.getPort());
-
-                    //try {
-                    //    serverSocket.send(sendPacket);      // Send the packet to the client
-                    //} catch (IOException e) {
-                    //    throw new RuntimeException(e);
-                    //}
-
-                    //if (DEBUG) System.out.println("Message sent!");
+                    System.out.println("File found: " + ownerIP + ":" + ownerPort);
+                    p1.setStatus(0);
                 }
+
+                //setActiveConnection(false);
 
             } catch (IOException e) {
                 if (DEBUG) System.out.println("Connection timed out...");
-                activeConnection = false;
+                if(p1.getStatus() == 1) {
+                    System.out.println("File not found!");
+                    p1.setStatus(0);
+                }
+                setActiveConnection(false);
                 serverSocket.close();
                 throw new RuntimeException(e);
             } finally {
